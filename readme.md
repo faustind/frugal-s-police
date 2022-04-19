@@ -24,3 +24,19 @@ Functionalities
 - Every month the bot can compute the total amount spent on online subscriptions
 - The bot warns for months when the total cost of subscriptions exceeds the budget.
 - The bot informs each subscription when the payday is near
+
+
+## Deploy
+
+```
+docker buildx build --platform linux/amd64 -t aubipo .
+
+# make sure to use the name of your Heroku app
+docker tag aubipo registry.heroku.com/aubipo/web
+
+# use docker push to push it to the Heroku registry
+docker push registry.heroku.com/aubipo/web
+
+# then use heroku release to activate
+heroku container:release web -a aubipo
+```
