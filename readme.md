@@ -29,14 +29,44 @@ Functionalities
 ## Deploy
 
 ```
-docker buildx build --platform linux/amd64 -t aubipo .
-
-# make sure to use the name of your Heroku app
-docker tag aubipo registry.heroku.com/aubipo/web
-
-# use docker push to push it to the Heroku registry
-docker push registry.heroku.com/aubipo/web
-
-# then use heroku release to activate
-heroku container:release web -a aubipo
+./deploy.sh
 ```
+
+## Messages
+
+- string are case insensitive
+- currency is JPY
+- format for dates is YYYYMMDD
+
+### set budget
+
+```
+yen 'amount'
+```
+
+- `yen`: integer 
+  - Maximum amount the user plans to spend monthly on online services 
+
+### add subscription
+
+```
+eye 'name' 'cost' 'startdate' ['enddate']
+```
+
+Track due dates (monthly) of subscription
+
+- `name`: string
+- `cost`: integer
+- `startdate`: YYYYMMDD
+- `enddate`: YYYMMDD (optional)
+    - When the user wishes to unsubscribe from service.
+
+### remove subscription
+
+```
+del 'name'
+```
+
+Stop tracking the subscription with given name and remove it from db.
+
+- `name`: string
