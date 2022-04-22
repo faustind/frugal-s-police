@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 var (
@@ -12,7 +13,9 @@ var (
 )
 
 func Connect() {
-	d, err := gorm.Open(sqlite.Open("aubipo.db"), &gorm.Config{})
+	d, err := gorm.Open(sqlite.Open("aubipo.db"), &gorm.Config{
+		Logger: logger.Default,
+	})
 	if err != nil {
 		log.Fatalf("failed to connect database: %s", err)
 	}
