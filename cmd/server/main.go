@@ -7,8 +7,10 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"faustind/aubipo/pkg/models"
+	"faustind/aubipo/pkg/utils"
 
 	"github.com/line/line-bot-sdk-go/v7/linebot"
 )
@@ -22,7 +24,66 @@ func main() {
 		log.Fatalf("AUBIPO: %s", err)
 	}
 
-	// Setup HTTP Server for receiving requests from LINE platform
+	http.HandleFunc("/check-due-dates", func(w http.ResponseWriter, req *http.Request) {
+		// Get all users
+		// for each user get all subscriptions
+		// for each subscription
+		// get the one due next week
+		log.Print("CHECKING DUE DATES...")
+		users, err := models.GetAllUsers()
+		if err != nil {
+			log.Printf("AUBIPO: CHECK-DUE-DATE ERROR \n %s", err)
+		}
+
+		today := time.Now()
+		for _, user := range users {
+			user.Subscriptions, err = models.GetAllSubscriptionsByUser(user.ID)
+			if err != nil {
+				log.Printf("AUBIPO: CHECK-DUE-DATE ERROR \n %s", err)
+			}
+			for _, sub := range user.Subscriptions {
+
+				lastPayDay := time.Date(sub.LastPayMonth/100, time.Month(sub.LastPayMonth%100), sub.DueDay,
+					0, 0, 0, 0, time.Local)
+
+				if today.Day() == 1 {
+					if today.Month() == lastPayDay.Month() {
+						msg := fmt.Sprintf("This is the last month you are planning to pay for %s.\nI will remind you to unsubscribe before the due date next month.", sub.Name)
+						if _, err := bot.PushMessage(user.ID,
+							linebot.NewTextMessage(msg)).Do(); err != nil {
+							log.Print(err)
+						}
+					}
+				}
+
+				var msg string
+
+				if utils.IsTomorrow(sub.DueDay) {
+					log.Print("Due day tomorrow")
+					msg = fmt.Sprintf("Your subscription to %s is due tomorrow.", sub.Name)
+				} else if utils.IsInOneWeek(sub.DueDay) {
+					log.Print("Due day in one week")
+					msg = fmt.Sprintf("Your subscription to %s is due next week.", sub.Name)
+				}
+
+				if time.Month((sub.LastPayMonth%100)+1) == today.Month() {
+					// last month was the last month
+					// the user does not wish to pay the subscription for this month
+					msg += fmt.Sprintf("\nYou did not plan to pay for %s this month. Don't forget to unsubscribe!", sub.Name)
+				}
+
+				if _, err := bot.PushMessage(user.ID,
+					linebot.NewTextMessage(msg)).Do(); err != nil {
+					log.Print(err)
+				}
+				continue
+			}
+		}
+
+		log.Print("DONE CHECKING DUE DATES.")
+		w.WriteHeader(200)
+	})
+
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		events, err := bot.ParseRequest(req)
 		if err != nil {
@@ -101,10 +162,11 @@ func main() {
 							log.Print(err)
 							return
 						}
-						replyMsg := fmt.Sprintf("budget %d, n subscription %d\n", user.Budget, len(subscriptions))
+						replyMsg := fmt.Sprintf("n subscription %d\n", len(subscriptions))
 						for key, sub := range subscriptions {
-							msg := fmt.Sprintf("%d %s %d %s %s\n",
-								key, sub.Name, sub.Cost, sub.StartDate, sub.EndDate)
+							// TODO: Write this in a better format.
+							msg := fmt.Sprintf("%d %s %d %d %d\n",
+								key+1, sub.Name, sub.Cost, sub.DueDay, sub.LastPayMonth)
 							replyMsg += msg
 						}
 						if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMsg)).Do(); err != nil {
@@ -112,6 +174,7 @@ func main() {
 						}
 						return
 					}
+
 					msg := strings.Fields(strings.ToLower(message.Text))
 
 					if len(msg) == 2 && msg[0] == "yen" {
@@ -165,11 +228,20 @@ func main() {
 						// create/update subscription
 						log.Printf("AUBIPO:EYE %s FROM %s", msg[1], userId)
 
-						var name, startDate, endDate string
-						var cost int
+						var name string
+						var cost, dueDay, lastMonth int
 
-						name, startDate = msg[1], msg[3]
+						name = msg[1]
 
+						lastMonth, err = strconv.Atoi(msg[4])
+						if err != nil || len(msg[4]) != 6 {
+							log.Printf("AUBIPO: BAD LAST_MONTH VALUE: %s", msg[4])
+							replyMsg := fmt.Sprintf("BAD LAST MONTH VALUE: %s", msg[4])
+							if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMsg)).Do(); err != nil {
+								log.Printf("AUBIPO: %s", err)
+							}
+							return
+						}
 						cost, err = strconv.Atoi(msg[2])
 						if err != nil {
 							log.Printf("AUBIPO: BAD YEN VALUE: %s", msg[2])
@@ -179,18 +251,25 @@ func main() {
 							}
 							return
 						}
-						if len(msg) == 5 {
-							endDate = msg[4]
+
+						dueDay, err = strconv.Atoi(msg[3])
+						if err != nil || 31 < dueDay || dueDay < 0 {
+							log.Printf("AUBIPO: BAD DUE DATE: %s", msg[3])
+							replyMsg := fmt.Sprintf("BAD YEN VALUE: %s", msg[3])
+							if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMsg)).Do(); err != nil {
+								log.Printf("AUBIPO: %s", err)
+							}
+							return
 						}
 
 						if msg[0] == "eye" {
 							// create
 							CreateSub := &models.Subscription{
-								Name:      name,
-								UserID:    userId,
-								Cost:      cost,
-								StartDate: startDate,
-								EndDate:   endDate,
+								Name:         name,
+								UserID:       userId,
+								Cost:         cost,
+								DueDay:       dueDay,
+								LastPayMonth: lastMonth,
 							}
 							_, err := CreateSub.CreateSubscription()
 							if err != nil {
@@ -209,11 +288,11 @@ func main() {
 						} else if msg[0] == "upd" {
 							// update
 							UpdateSub := &models.Subscription{
-								Name:      name,
-								UserID:    userId,
-								Cost:      cost,
-								StartDate: startDate,
-								EndDate:   endDate,
+								Name:         name,
+								UserID:       userId,
+								Cost:         cost,
+								DueDay:       dueDay,
+								LastPayMonth: lastMonth,
 							}
 							_, err := UpdateSub.UpdateSubscription()
 							if err != nil {

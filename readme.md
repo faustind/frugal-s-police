@@ -20,9 +20,9 @@ subscription set by Paul is expired, the bot will remind Paul to unsubscribe.
 Functionalities
 
 - Users can set a monthly budget for subscriptions.
-- Users can specify monthly cost, start date, end date for a subscription
-- Every month the bot can compute the total amount spent on online subscriptions
-- The bot warns for months when the total cost of subscriptions exceeds the budget.
+- Users can specify/edit monthly cost, start date, end date for a subscription
+- ~Every month the bot can compute the total amount spent on online subscriptions~
+- ~The bot warns for months when the total cost of subscriptions exceeds the budget~.
 - The bot informs each subscription when the payday is near
 
 
@@ -38,7 +38,7 @@ Functionalities
 - currency is JPY
 - format for dates is YYYYMMDD
 
-### set budget
+### ~set budget~
 
 ```
 yen 'amount'
@@ -50,16 +50,17 @@ yen 'amount'
 ### add subscription
 
 ```
-eye 'name' 'cost' 'startdate' ['enddate']
+eye 'name' 'cost' 'duedate' 'lastmonth'
 ```
 
 Track due dates (monthly) of subscription
 
 - `name`: string
 - `cost`: integer
-- `startdate`: YYYYMMDD
-- `enddate`: YYYMMDD (optional)
-    - When the user wishes to unsubscribe from service.
+- `duedate`: YYYYMMDD
+- `lastmonth`: YYYMM 
+    - The last month the user wishes to pay for the service.
+    - the bot will inform you to unsubscribe before the due date in this month
 
 ### remove subscription
 

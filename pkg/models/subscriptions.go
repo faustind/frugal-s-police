@@ -1,13 +1,15 @@
 package models
 
-import "database/sql"
+import (
+	"database/sql"
+)
 
 type Subscription struct {
-	UserID    string `gorm:"PrimaryKey"`
-	Name      string `gorm:"PrimaryKey"`
-	Cost      int
-	StartDate string
-	EndDate   string
+	UserID       string `gorm:"PrimaryKey"`
+	Name         string `gorm:"PrimaryKey"`
+	Cost         int
+	DueDay       int
+	LastPayMonth int
 }
 
 func (s *Subscription) CreateSubscription() (*Subscription, error) {

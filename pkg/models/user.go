@@ -11,6 +11,12 @@ func (u *User) CreateUser() (*User, error) {
 	return u, err
 }
 
+func GetAllUsers() ([]User, error) {
+	var users []User
+	err := db.Find(&users).Error
+	return users, err
+}
+
 func GetUserById(Id string) (*User, error) {
 	var user *User
 	err := db.Where("id=?", Id).Find(&user).Error
