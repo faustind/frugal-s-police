@@ -20,23 +20,54 @@ subscription set by Paul is expired, the bot will remind Paul to unsubscribe.
 Functionalities
 
 - Users can set a monthly budget for subscriptions.
-- Users can specify monthly cost, start date, end date for a subscription
-- Every month the bot can compute the total amount spent on online subscriptions
-- The bot warns for months when the total cost of subscriptions exceeds the budget.
+- Users can specify/edit monthly cost, start date, end date for a subscription
+- ~Every month the bot can compute the total amount spent on online subscriptions~
+- ~The bot warns for months when the total cost of subscriptions exceeds the budget~.
 - The bot informs each subscription when the payday is near
 
 
 ## Deploy
 
 ```
-docker buildx build --platform linux/amd64 -t aubipo .
-
-# make sure to use the name of your Heroku app
-docker tag aubipo registry.heroku.com/aubipo/web
-
-# use docker push to push it to the Heroku registry
-docker push registry.heroku.com/aubipo/web
-
-# then use heroku release to activate
-heroku container:release web -a aubipo
+./deploy.sh
 ```
+
+## Messages
+
+- string are case insensitive
+- currency is JPY
+- format for dates is YYYYMMDD
+
+### ~set budget~
+
+```
+yen 'amount'
+```
+
+- `yen`: integer 
+  - Maximum amount the user plans to spend monthly on online services 
+
+### add subscription
+
+```
+eye 'name' 'cost' 'duedate' 'lastmonth'
+```
+
+Track due dates (monthly) of subscription
+
+- `name`: string
+- `cost`: integer
+- `duedate`: YYYYMMDD
+- `lastmonth`: YYYMM 
+    - The last month the user wishes to pay for the service.
+    - the bot will inform you to unsubscribe before the due date in this month
+
+### remove subscription
+
+```
+del 'name'
+```
+
+Stop tracking the subscription with given name and remove it from db.
+
+- `name`: string
