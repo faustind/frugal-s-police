@@ -18,6 +18,11 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// serve /static/** files
+	staticFileServer := http.FileServer(http.Dir("static"))
+	http.HandleFunc("/static/", http.StripPrefix("/static/", staticFileServer).ServeHTTP)
+
+	http.HandleFunc("/create-rich-menu", bot.SetRichMenu)
 	http.HandleFunc("/", bot.Callback)
 	http.HandleFunc("/check-due-dates", bot.CheckDueDates)
 	if err := http.ListenAndServe(":"+os.Getenv("PORT"), nil); err != nil {

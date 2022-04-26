@@ -130,6 +130,15 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				log.Printf("AUBIPO:UNFOLLOW ERR: \n %s", err)
 			}
+
+		case linebot.EventTypePostback:
+			data := event.Postback.Data
+			if data == "DATE" || data == "TIME" || data == "DATETIME" {
+				data += fmt.Sprintf("(%v)", *event.Postback.Params)
+			}
+			if err := app.replyText(event.ReplyToken, "Got postback: "+data); err != nil {
+				log.Print(err)
+			}
 		default:
 			log.Printf("Unknown event: %v", event)
 		}
@@ -327,4 +336,78 @@ func (app *KitchenSink) pushMessage(userId, text string) error {
 		return err
 	}
 	return nil
+}
+
+func (app *KitchenSink) SetRichMenu(w http.ResponseWriter, r *http.Request) {
+	log.Print("Setting rich menu")
+	// set rich menu and get rich menu id
+	richMenu := linebot.RichMenu{
+		Size:        linebot.RichMenuSize{Width: 2500, Height: 843},
+		Selected:    true,
+		Name:        "add-list-close",
+		ChatBarText: "Menu",
+		Areas: []linebot.AreaDetail{
+			{
+				Bounds: linebot.RichMenuBounds{
+					X:      0,
+					Y:      0,
+					Width:  833,
+					Height: 843,
+				},
+				Action: linebot.RichMenuAction{
+					Type:        linebot.RichMenuActionTypePostback,
+					DisplayText: "track",
+					Data:        "eye",
+				},
+			},
+			{
+				Bounds: linebot.RichMenuBounds{
+					X:      834,
+					Y:      0,
+					Width:  834,
+					Height: 843,
+				},
+				Action: linebot.RichMenuAction{
+					Type:        linebot.RichMenuActionTypePostback,
+					DisplayText: "list",
+					Data:        "list",
+				},
+			},
+			{
+				Bounds: linebot.RichMenuBounds{
+					X:      1667,
+					Y:      0,
+					Width:  833,
+					Height: 843,
+				},
+				Action: linebot.RichMenuAction{
+					Type:        linebot.RichMenuActionTypePostback,
+					DisplayText: "X",
+					Data:        "close",
+				},
+			},
+		},
+	}
+
+	res, err := app.bot.CreateRichMenu(richMenu).Do()
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	log.Printf("rich menu id: %s", res.RichMenuID)
+
+	// attach rich menu-image to rich menu id
+	if _, err = app.bot.UploadRichMenuImage(res.RichMenuID, "/app/static/rich.png").Do(); err != nil {
+		log.Print(err)
+		return
+	}
+
+	// set default rich menu
+	if _, err = app.bot.SetDefaultRichMenu(res.RichMenuID).Do(); err != nil {
+		log.Print(err)
+		return
+	}
+
+	log.Print("done setting rich menu")
 }
