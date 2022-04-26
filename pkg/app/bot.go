@@ -166,7 +166,8 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 
 	msg := strings.Fields(strings.ToLower(message.Text))
 
-	if len(msg) == 2 && msg[0] == "del" {
+	switch {
+	case len(msg) == 2 && msg[0] == "del":
 		// stop tracking subscription
 		log.Printf("AUBIPO:DEL SUBSCRIPTION %s FROM %s", msg[1], userId)
 
@@ -178,9 +179,8 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 		replyMsg := fmt.Sprintf("Successfully stopped tracking your subscription to %s", msg[1])
 
 		return app.replyText(replyToken, replyMsg)
-	}
 
-	if len(msg) == 4 || len(msg) == 5 {
+	case len(msg) == 5:
 		// create/update subscription
 		log.Printf("AUBIPO:EYE %s FROM %s", msg[1], userId)
 
@@ -209,7 +209,8 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 			return app.replyText(replyToken, replyMsg)
 		}
 
-		if msg[0] == "eye" {
+		switch msg[0] {
+		case "eye":
 			// create
 			CreateSub := &models.Subscription{
 				Name:         name,
@@ -226,7 +227,7 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 			}
 			replyMsg := fmt.Sprintf("Tracking subscription to %s", name)
 			return app.replyText(replyToken, replyMsg)
-		} else if msg[0] == "upd" {
+		case "upd":
 			// update
 			UpdateSub := &models.Subscription{
 				Name:         name,
@@ -243,7 +244,6 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 			}
 			replyMsg := fmt.Sprintf("Updated subscription to %s", name)
 			return app.replyText(replyToken, replyMsg)
-
 		}
 	}
 
@@ -307,7 +307,6 @@ func (app *KitchenSink) CheckDueDates(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	log.Print("DONE CHECKING DUE DATES.")
 	w.WriteHeader(200)
 }
 
