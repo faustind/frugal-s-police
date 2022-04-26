@@ -126,6 +126,10 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 		case linebot.EventTypeUnfollow:
 			// remove user and her subs from db
 			log.Printf("Unfollowed this bot: %v", event)
+			err := models.DeleteAllByUser(userId)
+			if err != nil {
+				log.Printf("AUBIPO:UNFOLLOW ERR: \n %s", err)
+			}
 			_, err = models.DeleteUser(userId)
 			if err != nil {
 				log.Printf("AUBIPO:UNFOLLOW ERR: \n %s", err)
@@ -342,11 +346,24 @@ func (app *KitchenSink) SetRichMenu(w http.ResponseWriter, r *http.Request) {
 	log.Print("Setting rich menu")
 	// set rich menu and get rich menu id
 	richMenu := linebot.RichMenu{
-		Size:        linebot.RichMenuSize{Width: 2500, Height: 843},
-		Selected:    true,
-		Name:        "add-list-close",
-		ChatBarText: "Menu",
+		Size:        linebot.RichMenuSize{Width: 2500, Height: 1264},
+		Selected:    false,
+		Name:        "help-and-list",
+		ChatBarText: "Help",
 		Areas: []linebot.AreaDetail{
+			{
+				Bounds: linebot.RichMenuBounds{
+					X:      0,
+					Y:      843,
+					Width:  2500,
+					Height: 421,
+				},
+				Action: linebot.RichMenuAction{
+					Type:        linebot.RichMenuActionTypePostback,
+					DisplayText: "List subscriptions",
+					Data:        "list",
+				},
+			},
 			{
 				Bounds: linebot.RichMenuBounds{
 					X:      0,
@@ -356,7 +373,7 @@ func (app *KitchenSink) SetRichMenu(w http.ResponseWriter, r *http.Request) {
 				},
 				Action: linebot.RichMenuAction{
 					Type:        linebot.RichMenuActionTypePostback,
-					DisplayText: "track",
+					DisplayText: "How to track?",
 					Data:        "eye",
 				},
 			},
@@ -369,8 +386,8 @@ func (app *KitchenSink) SetRichMenu(w http.ResponseWriter, r *http.Request) {
 				},
 				Action: linebot.RichMenuAction{
 					Type:        linebot.RichMenuActionTypePostback,
-					DisplayText: "list",
-					Data:        "list",
+					DisplayText: "How to edit?",
+					Data:        "edit",
 				},
 			},
 			{
@@ -382,8 +399,8 @@ func (app *KitchenSink) SetRichMenu(w http.ResponseWriter, r *http.Request) {
 				},
 				Action: linebot.RichMenuAction{
 					Type:        linebot.RichMenuActionTypePostback,
-					DisplayText: "X",
-					Data:        "close",
+					DisplayText: "How to delete?",
+					Data:        "delete",
 				},
 			},
 		},
