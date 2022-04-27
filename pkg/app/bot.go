@@ -105,7 +105,7 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 			log.Printf("AUBIPO:LINE EVENT: follow FROM %s", user.ID)
 
 			replyMessage := "Please, check the help menu for how to give me instructions."
-			if err := app.replyText(event.ReplyToken, replyMessage); err != nil {
+			if err := app.pushMessage(userId, replyMessage); err != nil {
 				log.Printf("AUBIPO:REPLY_ERR: %s", err)
 			}
 
@@ -203,22 +203,23 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 		if err != nil {
 			return err
 		}
+		log.Printf("len(subscriptions) = %d", len(subscriptions))
 		for _, sub := range subscriptions {
 			lastPayDay := time.Date(sub.LastPayMonth/100, time.Month(sub.LastPayMonth%100), sub.DueDay,
 				0, 0, 0, 0, time.Local)
 			msg := fmt.Sprintf("Cost: %d \nDue date: %d \nPay until: %s %d",
 				sub.Cost, sub.DueDay, lastPayDay.Month(), lastPayDay.Year())
 
-			template := linebot.NewButtonsTemplate(
-				"", sub.Name, msg,
-				linebot.NewMessageAction("Edit", "Edit "+sub.Name),
-				linebot.NewMessageAction("Delete", "Delete "+sub.Name),
-			)
-			if _, err := app.bot.ReplyMessage(
-				replyToken,
-				linebot.NewTemplateMessage("Edit or Delete buttons", template),
-			).Do(); err != nil {
-				return err
+			template := linebot.NewTemplateMessage(
+				"Edit or Delete buttons",
+				linebot.NewButtonsTemplate(
+					"", sub.Name, msg,
+					linebot.NewMessageAction("Edit", "Edit "+sub.Name),
+					linebot.NewMessageAction("Delete", "Delete "+sub.Name),
+				))
+			if _, err := app.bot.PushMessage(
+				userId, template).Do(); err != nil {
+				log.Print(err)
 			}
 		}
 		if len(subscriptions) == 0 {
