@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -18,9 +17,8 @@ import (
 
 // KitchenSink app
 type KitchenSink struct {
-	bot         *linebot.Client
-	appBaseURL  string
-	downloadDir string
+	bot        *linebot.Client
+	appBaseURL string
 }
 
 // NewKitchenSink function
@@ -37,17 +35,9 @@ func NewKitchenSink(channelSecret, channelToken, appBaseURL string) (*KitchenSin
 	if err != nil {
 		return nil, err
 	}
-	downloadDir := filepath.Join(filepath.Dir(os.Args[0]), "line-bot")
-	_, err = os.Stat(downloadDir)
-	if err != nil {
-		if err := os.Mkdir(downloadDir, 0777); err != nil {
-			return nil, err
-		}
-	}
 	return &KitchenSink{
-		bot:         bot,
-		appBaseURL:  appBaseURL,
-		downloadDir: downloadDir,
+		bot:        bot,
+		appBaseURL: appBaseURL,
 	}, nil
 }
 
@@ -98,9 +88,6 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		case linebot.EventTypeFollow:
-			if err := app.replyText(event.ReplyToken, "Got followed event"); err != nil {
-				log.Print(err)
-			}
 			// save user to db
 			var CreateUser = &models.User{}
 
@@ -117,7 +104,6 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 
 			log.Printf("AUBIPO:LINE EVENT: follow FROM %s", user.ID)
 
-			// send instruction to set budget
 			replyMessage := "Please, check the help menu for how to give me instructions."
 			if err := app.replyText(event.ReplyToken, replyMessage); err != nil {
 				log.Printf("AUBIPO:REPLY_ERR: %s", err)
@@ -136,41 +122,61 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 			}
 
 		case linebot.EventTypePostback:
-			data := event.Postback.Data
-			log.Printf("got postback data: %s", data)
-			switch data {
-			case "list":
-				err := app.handleText(&linebot.TextMessage{Text: "list"}, event.ReplyToken, event.Source)
-				if err != nil {
-					log.Print(err)
-				}
-			case "track":
-				msg := "To track your subscription to a service send:\n\n"
-				msg += "track SERVICE_NAME COST DUE_DATE LAST_MONTH\n\n"
-				msg += "For example, you are using hulu due every 6th and costing 800 yen. "
-				msg += "If the last month you wish to pay for the service is December 2022 send:\n\n"
-				msg += "track hulu 800 06 202212\n\n"
-				msg += "I will remind you to unsubscribe after the due date on December 2022."
-				if err := app.replyText(event.ReplyToken, msg); err != nil {
-					log.Print(err)
-				}
-			case "edit":
-				msg := "To edit your subscription to a service send:\n\n"
-				msg += "edit SERVICE_NAME COST DUE_DATE LAST_MONTH\n\n"
-				msg += "For example, if you change your mind and want to pay for hulu until March 2023 send:\n\n"
-				msg += "edit hulu 800 06 202303\n\n"
-				msg += "I will remind you to unsubscribe after the due date on March 2023."
+			data := strings.Fields(strings.ToLower(event.Postback.Data))
+			log.Printf("got postback data: %s", event.Postback.Data)
+			if len(data) == 1 {
+				switch data[0] {
+				case "list":
+					err := app.handleText(&linebot.TextMessage{Text: "list"}, event.ReplyToken, event.Source)
+					if err != nil {
+						log.Print(err)
+					}
+				case "track":
+					msg := "To track your subscription to a service send:\n\n"
+					msg += "track SERVICE_NAME COST DUE_DATE LAST_MONTH\n\n"
+					msg += "For example, you are using hulu due every 6th and costing 800 yen. "
+					msg += "If the last month you wish to pay for the service is December 2022 send:\n\n"
+					msg += "track hulu 800 06 202212\n\n"
+					msg += "I will remind you to unsubscribe after the due date on December 2022."
+					if err := app.replyText(event.ReplyToken, msg); err != nil {
+						log.Print(err)
+					}
+				case "edit":
+					msg := "To edit your subscription to a service send:\n\n"
+					msg += "edit SERVICE_NAME COST DUE_DATE LAST_MONTH\n\n"
+					msg += "For example, if you change your mind and want to pay for hulu until March 2023 send:\n\n"
+					msg += "edit hulu 800 06 202303\n\n"
+					msg += "I will remind you to unsubscribe after the due date on March 2023."
 
-				if err := app.replyText(event.ReplyToken, msg); err != nil {
-					log.Print(err)
-				}
-			case "delete":
-				msg := "To stop tracking a subscription send:\n\n"
-				msg += "delete SERVICE_NAME\n\n"
-				msg += "For example, to stop tracking your subscription to hulu send:\n"
-				msg += "delete hulu"
+					if err := app.replyText(event.ReplyToken, msg); err != nil {
+						log.Print(err)
+					}
+				case "delete":
+					msg := "To stop tracking a subscription send:\n\n"
+					msg += "delete SERVICE_NAME\n\n"
+					msg += "For example, to stop tracking your subscription to hulu send:\n"
+					msg += "delete hulu"
 
-				if err := app.replyText(event.ReplyToken, msg); err != nil {
+					if err := app.replyText(event.ReplyToken, msg); err != nil {
+						log.Print(err)
+					}
+				}
+			} else if len(data) == 3 && data[1] == "delete" {
+				replyMsg := ""
+				if data[0] == "confirm" {
+					_, err := models.DeleteSubscription(userId, data[2])
+					if err != nil {
+						replyMsg = fmt.Sprintf("Sorry, I couldn't stop tracking your subscription to %s", data[2])
+						replyMsg += "Please remind me to do it later!"
+						log.Print(err)
+					} else {
+						replyMsg = fmt.Sprintf("Successfully stopped tracking your subscription to %s", data[2])
+					}
+				}
+				if data[0] == "cancel" {
+					replyMsg = "Okay!"
+				}
+				if err := app.replyText(event.ReplyToken, replyMsg); err != nil {
 					log.Print(err)
 				}
 			}
@@ -187,6 +193,7 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 	switch {
 	case len(msg) == 1 && msg[0] == "list":
 		// send budget and list subscriptions
+		log.Print("Got message: list")
 		user, err := models.GetUserById(userId)
 		if err != nil {
 			return err
@@ -196,31 +203,46 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 		if err != nil {
 			return err
 		}
-		replyMsg := fmt.Sprintf("n subscription %d\n", len(subscriptions))
-		for key, sub := range subscriptions {
-			// TODO: Write this in a better format.
-			msg := fmt.Sprintf("%d %s %d %d %d\n",
-				key+1, sub.Name, sub.Cost, sub.DueDay, sub.LastPayMonth)
-			replyMsg += msg
+		for _, sub := range subscriptions {
+			lastPayDay := time.Date(sub.LastPayMonth/100, time.Month(sub.LastPayMonth%100), sub.DueDay,
+				0, 0, 0, 0, time.Local)
+			msg := fmt.Sprintf("Cost: %d \nDue date: %d \nPay until: %s %d",
+				sub.Cost, sub.DueDay, lastPayDay.Month(), lastPayDay.Year())
+
+			template := linebot.NewButtonsTemplate(
+				"", sub.Name, msg,
+				linebot.NewMessageAction("Edit", "Edit "+sub.Name),
+				linebot.NewMessageAction("Delete", "Delete "+sub.Name),
+			)
+			if _, err := app.bot.ReplyMessage(
+				replyToken,
+				linebot.NewTemplateMessage("Edit or Delete buttons", template),
+			).Do(); err != nil {
+				return err
+			}
 		}
-		if err = app.replyText(replyToken, replyMsg); err != nil {
-			log.Printf("AUBIPO: %s", err)
-			return err
+		if len(subscriptions) == 0 {
+			return app.replyText(replyToken, "At the moment, I am not keeping track of any subscription for you.")
 		}
-		return nil
 	case len(msg) == 2 && msg[0] == "delete":
 		// stop tracking subscription
 		log.Printf("AUBIPO:DEL SUBSCRIPTION %s FROM %s", msg[1], userId)
-
-		_, err := models.DeleteSubscription(userId, msg[1])
-		if err != nil {
+		template := linebot.NewConfirmTemplate(
+			fmt.Sprintf("Do you want to delete %s?", msg[1]),
+			linebot.NewPostbackAction("Yes", "confirm delete "+msg[1], "", "Yes, I want to delete "+msg[1]),
+			linebot.NewPostbackAction("Cancel", "cancel delete "+msg[1], "", "No!"),
+		)
+		if _, err := app.bot.ReplyMessage(
+			replyToken,
+			linebot.NewTemplateMessage("Yes or Cancel buttons", template),
+		).Do(); err != nil {
 			return err
 		}
-
-		replyMsg := fmt.Sprintf("Successfully stopped tracking your subscription to %s", msg[1])
-
+	case len(msg) == 2 && msg[0] == "edit": //
+		//
+		replyMsg := fmt.Sprintf("Please update %s by sending \n", msg[1])
+		replyMsg += fmt.Sprintf("update %s NEW_COST NEW_DUE_DATE NEW_LAST_MONTH", msg[1])
 		return app.replyText(replyToken, replyMsg)
-
 	case len(msg) == 5:
 		// create/update subscription
 		log.Printf("AUBIPO:EYE %s FROM %s", msg[1], userId)
