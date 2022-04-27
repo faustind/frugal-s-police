@@ -241,7 +241,7 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 		}
 	case len(msg) == 2 && msg[0] == "edit": //
 		//
-		replyMsg := fmt.Sprintf("Please update %s by sending \n", msg[1])
+		replyMsg := fmt.Sprintf("Please update %s by sending \n\n", msg[1])
 		replyMsg += fmt.Sprintf("update %s NEW_COST NEW_DUE_DATE NEW_LAST_MONTH", msg[1])
 		return app.replyText(replyToken, replyMsg)
 	case len(msg) == 5:
@@ -353,21 +353,27 @@ func (app *KitchenSink) CheckDueDates(w http.ResponseWriter, r *http.Request) {
 			if utils.IsTomorrow(sub.DueDay) {
 				log.Print("Due day tomorrow")
 				msg = fmt.Sprintf("Your subscription to %s is due tomorrow.", sub.Name)
+				if err := app.pushMessage(user.ID, msg); err != nil {
+					log.Print(err)
+				}
 			} else if utils.IsInOneWeek(sub.DueDay) {
 				log.Print("Due day in one week")
 				msg = fmt.Sprintf("Your subscription to %s is due next week.", sub.Name)
+				if err := app.pushMessage(user.ID, msg); err != nil {
+					log.Print(err)
+				}
 			}
 
 			if today.Year() == lastPayDay.Year() &&
 				time.Month((sub.LastPayMonth%100)+1) == today.Month() {
 				// last month was the last month
 				// the user does not wish to pay the subscription for this month
-				msg += fmt.Sprintf("\nYou did not plan to pay for %s this month. Don't forget to unsubscribe!", sub.Name)
+				msg = fmt.Sprintf("\nYou did not plan to pay for %s this month. Don't forget to unsubscribe!", sub.Name)
+				if err := app.pushMessage(user.ID, msg); err != nil {
+					log.Print(err)
+				}
 			}
 
-			if err := app.pushMessage(user.ID, msg); err != nil {
-				log.Print(err)
-			}
 			continue
 		}
 	}
