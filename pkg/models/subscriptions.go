@@ -40,7 +40,3 @@ func DeleteSubscription(userId, serviceName string) (Subscription, error) {
 	err := db.Where("user_id = @id AND name = @name", sql.Named("name", serviceName), sql.Named("id", userId)).Delete(s).Error
 	return s, err
 }
-
-func DeleteAllByUser(userId string) error {
-	return db.Where("user_id = @id", sql.Named("id", userId)).Delete(&Subscription{}).Error
-}
