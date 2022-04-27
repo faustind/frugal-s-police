@@ -339,37 +339,32 @@ func (app *KitchenSink) CheckDueDates(w http.ResponseWriter, r *http.Request) {
 			lastPayDay := time.Date(sub.LastPayMonth/100, time.Month(sub.LastPayMonth%100), sub.DueDay,
 				0, 0, 0, 0, time.Local)
 
-			if today.Day() == 1 {
-				if today.Year() == lastPayDay.Year() && today.Month() == lastPayDay.Month() {
-					msg := fmt.Sprintf("This is the last month you are planning to pay for %s.\nI will remind you to unsubscribe before the due date next month.", sub.Name)
-					if err := app.pushMessage(user.ID, msg); err != nil {
-						log.Print(err)
-					}
-				}
-			}
-
-			var msg string
-
 			if utils.IsTomorrow(sub.DueDay) {
 				log.Print("Due day tomorrow")
-				msg = fmt.Sprintf("Your subscription to %s is due tomorrow.", sub.Name)
+				msg := fmt.Sprintf("Your subscription to %s is due tomorrow.", sub.Name)
 				if err := app.pushMessage(user.ID, msg); err != nil {
 					log.Print(err)
 				}
 			} else if utils.IsInOneWeek(sub.DueDay) {
 				log.Print("Due day in one week")
-				msg = fmt.Sprintf("Your subscription to %s is due next week.", sub.Name)
+				msg := fmt.Sprintf("Your subscription to %s is due next week.", sub.Name)
 				if err := app.pushMessage(user.ID, msg); err != nil {
 					log.Print(err)
 				}
 			}
 
 			if today.Year() == lastPayDay.Year() &&
-				time.Month((sub.LastPayMonth%100)+1) == today.Month() {
-				// last month was the last month
+				time.Month((sub.LastPayMonth%100)) < today.Month() {
 				// the user does not wish to pay the subscription for this month
-				msg = fmt.Sprintf("\nYou did not plan to pay for %s this month. Don't forget to unsubscribe!", sub.Name)
-				if err := app.pushMessage(user.ID, msg); err != nil {
+				msg := fmt.Sprintf("You did not plan to pay for %s this month.", sub.Name)
+				template := linebot.NewTemplateMessage(
+					"Edit or Delete buttons",
+					linebot.NewButtonsTemplate(
+						"", sub.Name, msg,
+						linebot.NewMessageAction("Delete", "Delete "+sub.Name),
+					))
+				if _, err := app.bot.PushMessage(
+					user.ID, template).Do(); err != nil {
 					log.Print(err)
 				}
 			}
