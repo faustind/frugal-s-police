@@ -118,7 +118,7 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 			log.Printf("AUBIPO:LINE EVENT: follow FROM %s", user.ID)
 
 			// send instruction to set budget
-			replyMessage := "You can now set your monthly budget by sending: yen AMOUNT"
+			replyMessage := "Please, check the help menu for how to give me instructions."
 			if err := app.replyText(event.ReplyToken, replyMessage); err != nil {
 				log.Printf("AUBIPO:REPLY_ERR: %s", err)
 			}
@@ -137,11 +137,42 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 
 		case linebot.EventTypePostback:
 			data := event.Postback.Data
-			if data == "DATE" || data == "TIME" || data == "DATETIME" {
-				data += fmt.Sprintf("(%v)", *event.Postback.Params)
-			}
-			if err := app.replyText(event.ReplyToken, "Got postback: "+data); err != nil {
-				log.Print(err)
+			log.Printf("got postback data: %s", data)
+			switch data {
+			case "list":
+				err := app.handleText(&linebot.TextMessage{Text: "list"}, event.ReplyToken, event.Source)
+				if err != nil {
+					log.Print(err)
+				}
+			case "track":
+				msg := "To track your subscription to a service send:\n\n"
+				msg += "track SERVICE_NAME COST DUE_DATE LAST_MONTH\n\n"
+				msg += "For example, you are using hulu due every 6th and costing 800 yen. "
+				msg += "If the last month you wish to pay for the service is December 2022 send:\n\n"
+				msg += "track hulu 800 06 202212\n\n"
+				msg += "I will remind you to unsubscribe after the due date on December 2022."
+				if err := app.replyText(event.ReplyToken, msg); err != nil {
+					log.Print(err)
+				}
+			case "edit":
+				msg := "To edit your subscription to a service send:\n\n"
+				msg += "edit SERVICE_NAME COST DUE_DATE LAST_MONTH\n\n"
+				msg += "For example, if you change your mind and want to pay for hulu until March 2023 send:\n\n"
+				msg += "edit hulu 800 06 202303\n\n"
+				msg += "I will remind you to unsubscribe after the due date on March 2023."
+
+				if err := app.replyText(event.ReplyToken, msg); err != nil {
+					log.Print(err)
+				}
+			case "delete":
+				msg := "To stop tracking a subscription send:\n\n"
+				msg += "delete SERVICE_NAME\n\n"
+				msg += "For example, to stop tracking your subscription to hulu send:\n"
+				msg += "delete hulu"
+
+				if err := app.replyText(event.ReplyToken, msg); err != nil {
+					log.Print(err)
+				}
 			}
 		default:
 			log.Printf("Unknown event: %v", event)
@@ -151,9 +182,11 @@ func (app *KitchenSink) Callback(w http.ResponseWriter, r *http.Request) {
 
 func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken string, source *linebot.EventSource) error {
 	userId := source.UserID
-	if message.Text == "?" {
-		// send budget and list subscriptions
+	msg := strings.Fields(strings.ToLower(message.Text))
 
+	switch {
+	case len(msg) == 1 && msg[0] == "list":
+		// send budget and list subscriptions
 		user, err := models.GetUserById(userId)
 		if err != nil {
 			return err
@@ -175,12 +208,7 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 			return err
 		}
 		return nil
-	}
-
-	msg := strings.Fields(strings.ToLower(message.Text))
-
-	switch {
-	case len(msg) == 2 && msg[0] == "del":
+	case len(msg) == 2 && msg[0] == "delete":
 		// stop tracking subscription
 		log.Printf("AUBIPO:DEL SUBSCRIPTION %s FROM %s", msg[1], userId)
 
@@ -223,7 +251,7 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 		}
 
 		switch msg[0] {
-		case "eye":
+		case "track":
 			// create
 			CreateSub := &models.Subscription{
 				Name:         name,
@@ -240,7 +268,7 @@ func (app *KitchenSink) handleText(message *linebot.TextMessage, replyToken stri
 			}
 			replyMsg := fmt.Sprintf("Tracking subscription to %s", name)
 			return app.replyText(replyToken, replyMsg)
-		case "upd":
+		case "edit":
 			// update
 			UpdateSub := &models.Subscription{
 				Name:         name,
@@ -289,7 +317,7 @@ func (app *KitchenSink) CheckDueDates(w http.ResponseWriter, r *http.Request) {
 				0, 0, 0, 0, time.Local)
 
 			if today.Day() == 1 {
-				if today.Month() == lastPayDay.Month() {
+				if today.Year() == lastPayDay.Year() && today.Month() == lastPayDay.Month() {
 					msg := fmt.Sprintf("This is the last month you are planning to pay for %s.\nI will remind you to unsubscribe before the due date next month.", sub.Name)
 					if err := app.pushMessage(user.ID, msg); err != nil {
 						log.Print(err)
@@ -307,7 +335,8 @@ func (app *KitchenSink) CheckDueDates(w http.ResponseWriter, r *http.Request) {
 				msg = fmt.Sprintf("Your subscription to %s is due next week.", sub.Name)
 			}
 
-			if time.Month((sub.LastPayMonth%100)+1) == today.Month() {
+			if today.Year() == lastPayDay.Year() &&
+				time.Month((sub.LastPayMonth%100)+1) == today.Month() {
 				// last month was the last month
 				// the user does not wish to pay the subscription for this month
 				msg += fmt.Sprintf("\nYou did not plan to pay for %s this month. Don't forget to unsubscribe!", sub.Name)
@@ -374,7 +403,7 @@ func (app *KitchenSink) SetRichMenu(w http.ResponseWriter, r *http.Request) {
 				Action: linebot.RichMenuAction{
 					Type:        linebot.RichMenuActionTypePostback,
 					DisplayText: "How to track?",
-					Data:        "eye",
+					Data:        "track",
 				},
 			},
 			{
