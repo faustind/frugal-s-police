@@ -25,7 +25,8 @@ func GetUserById(Id string) (*User, error) {
 
 func DeleteUser(Id string) (User, error) {
 	var user User
-	err := db.Where("id = ?", Id).Delete(user).Error
+	// remove user and her subscription from db
+	err := db.Select("Subscriptions").Where("id = ?", Id).Delete(user).Error
 	return user, err
 }
 
